@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nixar SSI Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --card: #21242f;
+      --border: #2d3145;
+      --primary: #6c63ff;
+      --primary-hover: #5a52e0;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #e2e8f0;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    header .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    header .logo .icon {
+      width: 36px; height: 36px;
+      background: var(--primary);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    header .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+    .status-dot.active { background: var(--success); }
+
+    /* LAYOUT */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    /* STEP FLOW */
+    .flow {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      margin-bottom: 32px;
+      overflow-x: auto;
+      padding: 8px 0;
+    }
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: all .2s;
+      color: var(--text-secondary);
+    }
+    .flow-step:hover { border-color: var(--primary); color: var(--text); }
+    .flow-step.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+    .flow-step.done { background: rgba(34,197,94,.15); border-color: var(--success); color: var(--success); }
+    .flow-arrow {
+      color: var(--text-muted);
+      font-size: 18px;
+      padding: 0 6px;
+      flex-shrink: 0;
+    }
+    .flow-num {
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.12);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px;
+    }
+    .flow-step.active .flow-num { background: rgba(255,255,255,.25); }
+    .flow-step.done .flow-num { background: rgba(34,197,94,.3); }
+
+    /* PANELS */
+    .panels { display: flex; gap: 20px; }
+    .panel-left { flex: 1; min-width: 0; }
+    .panel-right { width: 400px; flex-shrink: 0; }
+
+    @media (max-width: 900px) {
+      .panels { flex-direction: column; }
+      .panel-right { width: 100%; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 18px;
+      line-height: 1.5;
+    }
+
+    /* FORMS */
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 14px;
+      font-family: inherit;
+      margin-bottom: 14px;
+      transition: border-color .2s;
+    }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+    }
+    textarea { resize: vertical; min-height: 80px; font-family: 'Courier New', monospace; font-size: 13px; }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+    /* LOG */
+    .log-area {
+      background: #0d0f14;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      max-height: 500px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.8;
+    }
+    .log-entry { padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.03); }
+    .log-time { color: var(--text-muted); margin-right: 8px; }
+    .log-ok { color: var(--success); }
+    .log-err { color: var(--danger); }
+    .log-info { color: var(--primary); }
+    .log-warn { color: var(--warning); }
+
+    /* RESULT */
+    .result-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 12px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      max-height: 180px;
+      overflow-y: auto;
+      word-break: break-all;
+      white-space: pre-wrap;
+    }
+
+    /* BADGES */
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .badge-issuer { background: rgba(108,99,255,.15); color: var(--primary); }
+    .badge-prover { background: rgba(34,197,94,.15); color: var(--success); }
+    .badge-verifier { background: rgba(245,158,11,.15); color: var(--warning); }
+
+    /* TABLE */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .data-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      max-width: 220px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .data-table tr:hover td { background: rgba(108,99,255,.05); }
+
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      margin-bottom: 16px;
+      border-bottom: 2px solid var(--border);
+    }
+    .tab-btn {
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      background: none;
+      border: none;
+      color: var(--text-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      transition: all .15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--text-muted);
+    }
+    .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+    .hidden { display: none; }
+
+    .loading { position: relative; pointer-events: none; }
+    .loading::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(15,17,23,.6);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* SSI FLOW DIAGRAM */
+    .ssi-roles {
+      display: flex;
+      justify-content: center;
+      gap: 32px;
+      margin-bottom: 24px;
+    }
+    .ssi-role {
+      text-align: center;
+      padding: 16px 24px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      min-width: 140px;
+    }
+    .ssi-role .emoji { font-size: 32px; margin-bottom: 6px; }
+    .ssi-role .name { font-weight: 700; font-size: 14px; }
+    .ssi-role .desc { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="icon">N</div>
+    Nixar SSI Dashboard
+  </div>
+  <div class="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Ajanlar başlatılmadı</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- SSI ROLES -->
+  <div class="ssi-roles">
+    <div class="ssi-role">
+      <div class="emoji">🏛️</div>
+      <div class="name">Issuer <span class="badge badge-issuer">Kurum</span></div>
+      <div class="desc">Kimlik bilgisi oluşturur ve imzalar</div>
+    </div>
+    <div class="ssi-role">
+      <div class="emoji">👤</div>
+      <div class="name">Prover <span class="badge badge-prover">Vatandaş</span></div>
+      <div class="desc">Kimliğini saklar ve sunar</div>
+    </div>
+    <div class="ssi-role">
+      <div class="emoji">🏦</div>
+      <div class="name">Verifier <span class="badge badge-verifier">Doğrulayıcı</span></div>
+      <div class="desc">Sunulan kimliği doğrular</div>
+    </div>
+  </div>
+
+  <!-- STEP FLOW -->
+  <div class="flow" id="flowBar">
+    <div class="flow-step active" data-step="0" onclick="goStep(0)">
+      <span class="flow-num">1</span> Ajanları Başlat
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" data-step="1" onclick="goStep(1)">
+      <span class="flow-num">2</span> Schema Oluştur
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" data-step="2" onclick="goStep(2)">
+      <span class="flow-num">3</span> Cred Def Oluştur
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" data-step="3" onclick="goStep(3)">
+      <span class="flow-num">4</span> Kimlik Ver
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" data-step="4" onclick="goStep(4)">
+      <span class="flow-num">5</span> Doğrula
+    </div>
+    <span class="flow-arrow">→</span>
+    <div class="flow-step" data-step="5" onclick="goStep(5)">
+      <span class="flow-num">6</span> Sorgula
+    </div>
+  </div>
+
+  <div class="panels">
+    <!-- LEFT: ACTION PANELS -->
+    <div class="panel-left">
+
+      <!-- STEP 0: Initialize -->
+      <div class="step-panel" id="step-0">
+        <div class="card">
+          <div class="card-title">1. Ajanları Başlat (PostgreSQL Wallet)</div>
+          <div class="card-desc">
+            Trustee aracılığıyla <strong>Issuer</strong>, <strong>Prover</strong> ve <strong>Verifier</strong> ajanlarını
+            ledger'a kaydeder ve PostgreSQL cüzdanlarını oluşturur. Tüm işlemlerin başlangıç noktasıdır.
+          </div>
+          <button class="btn btn-primary" id="btnInit" onclick="initAgents()">
+            Ajanları Başlat
+          </button>
+          <div class="result-box hidden" id="initResult"></div>
+        </div>
+      </div>
+
+      <!-- STEP 1: Schema -->
+      <div class="step-panel hidden" id="step-1">
+        <div class="card">
+          <div class="card-title">2. Schema Oluştur</div>
+          <div class="card-desc">
+            Issuer, kimlik bilgisinin hangi alanlardan oluşacağını tanımlayan bir <strong>Schema</strong> oluşturur.
+            Örneğin: ad, soyad, yaş, cinsiyet. Schema ledger'a yazılır ve herkes tarafından okunabilir.
+          </div>
+          <label>Schema Adı</label>
+          <input type="text" id="schemaName" value="DockerSchema_v0.1">
+          <label>Alanlar (virgülle)</label>
+          <input type="text" id="schemaAttrs" value="name,surname,age,gender">
+          <button class="btn btn-primary" onclick="createSchema()">Schema Oluştur</button>
+          <div class="result-box hidden" id="schemaResult"></div>
+        </div>
+      </div>
+
+      <!-- STEP 2: CredDef -->
+      <div class="step-panel hidden" id="step-2">
+        <div class="card">
+          <div class="card-title">3. Credential Definition Oluştur</div>
+          <div class="card-desc">
+            Issuer, oluşturduğu schema üzerinden bir <strong>Credential Definition</strong> oluşturur.
+            Bu, o kurumun bu schema ile kimlik belgesi (credential) verebilmesini sağlayan dijital imza altyapısıdır.
+          </div>
+          <label>Schema ID</label>
+          <input type="text" id="credDefSchemaId" placeholder="Otomatik doldurulacak...">
+          <label>İptal Edilebilir mi?</label>
+          <select id="credDefRevocable">
+            <option value="true">Evet (Revocable)</option>
+            <option value="false">Hayır</option>
+          </select>
+          <button class="btn btn-primary" onclick="createCredDef()">CredDef Oluştur</button>
+          <div class="result-box hidden" id="credDefResult"></div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Issue Credential -->
+      <div class="step-panel hidden" id="step-3">
+        <div class="card">
+          <div class="card-title">4. Kimlik Bilgisi Ver (Issue Credential)</div>
+          <div class="card-desc">
+            Issuer, Prover'a bir <strong>Credential</strong> verir. Bu işlemde Issuer teklif oluşturur,
+            Prover talep eder, Issuer imzalar ve Prover cüzdanına kaydeder. Gerçek dünyada diploma, ehliyet vb.
+          </div>
+          <label>Cred Def ID</label>
+          <input type="text" id="issueCredDefId" placeholder="Otomatik doldurulacak...">
+          <label>Değerler (JSON)</label>
+          <textarea id="issueValues">{"name": "Ahmet", "surname": "Yılmaz", "age": "30", "gender": "M"}</textarea>
+          <button class="btn btn-primary" onclick="issueCredential()">Kimlik Ver</button>
+          <div class="result-box hidden" id="issueResult"></div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Verify -->
+      <div class="step-panel hidden" id="step-4">
+        <div class="card">
+          <div class="card-title">5. Doğrulama Yap (Verify Presentation)</div>
+          <div class="card-desc">
+            Verifier, Prover'dan bir <strong>Presentation</strong> ister. Prover kimliğini cüzdanından çeker,
+            sıfır bilgi kanıtıyla sunar. Verifier, bu sunumun geçerli olup olmadığını doğrular.
+            Prover'ın verisini görmeden yaş kontrolü vb. yapılabilir (ZKP).
+          </div>
+          <label>Schema ID</label>
+          <input type="text" id="verifySchemaId" placeholder="Otomatik doldurulacak...">
+          <label>Cred Def ID</label>
+          <input type="text" id="verifyCredDefId" placeholder="Otomatik doldurulacak...">
+          <button class="btn btn-primary" onclick="verifyCredential()">Doğrula</button>
+          <div class="result-box hidden" id="verifyResult"></div>
+        </div>
+      </div>
+
+      <!-- STEP 5: Query -->
+      <div class="step-panel hidden" id="step-5">
+        <div class="card">
+          <div class="card-title">6. Sorgulama</div>
+          <div class="card-desc">Ledger ve cüzdan üzerindeki kayıtlı verileri sorgulayın.</div>
+
+          <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab(this,'tabSchemas')">Schemas</button>
+            <button class="tab-btn" onclick="switchTab(this,'tabCredDefs')">Cred Defs</button>
+            <button class="tab-btn" onclick="switchTab(this,'tabCreds')">Credentials</button>
+          </div>
+
+          <div class="tab-content active" id="tabSchemas">
+            <button class="btn btn-primary btn-sm" onclick="querySchemas()" style="margin-bottom:12px">Yenile</button>
+            <div id="schemasTable">
+              <div class="empty-state"><div class="icon">📋</div>Henüz yüklenmedi</div>
+            </div>
+          </div>
+          <div class="tab-content" id="tabCredDefs">
+            <button class="btn btn-primary btn-sm" onclick="queryCredDefs()" style="margin-bottom:12px">Yenile</button>
+            <div id="credDefsTable">
+              <div class="empty-state"><div class="icon">🔑</div>Henüz yüklenmedi</div>
+            </div>
+          </div>
+          <div class="tab-content" id="tabCreds">
+            <button class="btn btn-primary btn-sm" onclick="queryCreds()" style="margin-bottom:12px">Yenile</button>
+            <div id="credsTable">
+              <div class="empty-state"><div class="icon">🪪</div>Henüz yüklenmedi</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: LOG -->
+    <div class="panel-right">
+      <div class="card" style="position:sticky;top:24px">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          İşlem Geçmişi
+          <button class="btn btn-sm" onclick="clearLog()" style="background:var(--surface);color:var(--text-secondary);font-size:11px">Temizle</button>
+        </div>
+        <div class="log-area" id="logArea">
+          <div class="empty-state" style="padding:30px 10px;font-size:12px">
+            <div class="icon">📝</div>
+            Henüz işlem yapılmadı
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '';
+let currentStep = 0;
+let state = { schemaId: null, credDefId: null, initialized: false };
+
+// === LOGGING ===
+function log(msg, type = 'info') {
+  const area = document.getElementById('logArea');
+  if (area.querySelector('.empty-state')) area.innerHTML = '';
+  const time = new Date().toLocaleTimeString('tr-TR');
+  const cls = type === 'ok' ? 'log-ok' : type === 'err' ? 'log-err' : type === 'warn' ? 'log-warn' : 'log-info';
+  area.innerHTML += `<div class="log-entry"><span class="log-time">${time}</span><span class="${cls}">${msg}</span></div>`;
+  area.scrollTop = area.scrollHeight;
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '<div class="empty-state" style="padding:30px 10px;font-size:12px"><div class="icon">📝</div>Henüz işlem yapılmadı</div>';
+}
+
+// === STEP NAVIGATION ===
+function goStep(n) {
+  currentStep = n;
+  document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('hidden', i !== n));
+  document.querySelectorAll('.flow-step').forEach((s, i) => {
+    s.classList.remove('active');
+    if (i === n) s.classList.add('active');
+  });
+}
+
+function advanceStep() {
+  const steps = document.querySelectorAll('.flow-step');
+  if (currentStep < steps.length - 1) {
+    steps[currentStep].classList.remove('active');
+    steps[currentStep].classList.add('done');
+    currentStep++;
+    steps[currentStep].classList.add('active');
+    document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('hidden', i !== currentStep));
+  }
+}
+
+function showResult(id, data, isError = false) {
+  const el = document.getElementById(id);
+  el.classList.remove('hidden');
+  el.style.borderColor = isError ? 'var(--danger)' : 'var(--success)';
+  el.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+}
+
+// === API CALLS ===
+async function apiCall(method, url, body = null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(API + url, opts);
+  const data = await res.json();
+  if (!res.ok) {
+    // Pydantic 422 - detail is an array of {loc, msg, type}
+    if (Array.isArray(data.detail)) {
+      throw new Error(data.detail.map(e => e.msg).join('; '));
+    }
+    throw new Error(data.detail || JSON.stringify(data));
+  }
+  return data;
+}
+
+async function initAgents() {
+  const btn = document.getElementById('btnInit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Başlatılıyor...';
+  log('POST /agent/initialize gönderiliyor...', 'info');
+  try {
+    const data = await apiCall('POST', '/agent/initialize');
+    state.initialized = true;
+    document.getElementById('statusDot').classList.add('active');
+    document.getElementById('statusText').textContent = 'Ajanlar aktif | DID: ' + data.issuer_did;
+    showResult('initResult', data);
+    log('Ajanlar başarıyla başlatıldı ✓', 'ok');
+    log('Issuer DID: ' + data.issuer_did, 'ok');
+    setTimeout(advanceStep, 600);
+  } catch (e) {
+    showResult('initResult', e.message, true);
+    log('HATA: ' + e.message, 'err');
+  }
+  btn.disabled = false;
+  btn.innerHTML = 'Ajanları Başlat';
+}
+
+async function createSchema() {
+  const name = document.getElementById('schemaName').value;
+  const attrs = document.getElementById('schemaAttrs').value.split(',').map(s => s.trim());
+  log(`POST /schema → ${name} [${attrs.join(', ')}]`, 'info');
+  try {
+    const data = await apiCall('POST', '/schema', { schema_name: name, attributes: attrs });
+    state.schemaId = data.schema_id;
+    document.getElementById('credDefSchemaId').value = data.schema_id;
+    document.getElementById('verifySchemaId').value = data.schema_id;
+    showResult('schemaResult', data);
+    log('Schema oluşturuldu: ' + data.schema_id, 'ok');
+    setTimeout(advanceStep, 600);
+  } catch (e) {
+    showResult('schemaResult', e.message, true);
+    log('HATA: ' + e.message, 'err');
+  }
+}
+
+async function createCredDef() {
+  const schemaId = document.getElementById('credDefSchemaId').value.trim();
+  if (!schemaId) {
+    log('HATA: Schema ID boş. Önce 2. adımda schema oluşturun.', 'err');
+    showResult('credDefResult', 'schema_id boş olamaz. Önce schema oluşturun.', true);
+    return;
+  }
+  const revocable = document.getElementById('credDefRevocable').value === 'true';
+  log(`POST /cred-def → schema: ${schemaId}`, 'info');
+  try {
+    const data = await apiCall('POST', '/cred-def', { schema_id: schemaId, is_revocable: revocable });
+    state.credDefId = data.cred_def_id;
+    document.getElementById('issueCredDefId').value = data.cred_def_id;
+    document.getElementById('verifyCredDefId').value = data.cred_def_id;
+    showResult('credDefResult', data);
+    log('CredDef oluşturuldu: ' + data.cred_def_id, 'ok');
+    setTimeout(advanceStep, 600);
+  } catch (e) {
+    showResult('credDefResult', e.message, true);
+    log('HATA: ' + e.message, 'err');
+  }
+}
+
+async function issueCredential() {
+  const credDefId = document.getElementById('issueCredDefId').value;
+  let values;
+  try { values = JSON.parse(document.getElementById('issueValues').value); } catch { log('JSON formatı hatalı!', 'err'); return; }
+  log(`POST /credential/issue → cred_def: ${credDefId}`, 'info');
+  try {
+    const data = await apiCall('POST', '/credential/issue', { cred_def_id: credDefId, values });
+    showResult('issueResult', data);
+    log('Credential verildi: ' + data.store_cred_id, 'ok');
+    setTimeout(advanceStep, 600);
+  } catch (e) {
+    showResult('issueResult', e.message, true);
+    log('HATA: ' + e.message, 'err');
+  }
+}
+
+async function verifyCredential() {
+  const schemaId = document.getElementById('verifySchemaId').value;
+  const credDefId = document.getElementById('verifyCredDefId').value;
+  log(`POST /verification/verify`, 'info');
+  try {
+    const data = await apiCall('POST', '/verification/verify', { schema_id: schemaId, cred_def_id: credDefId });
+    showResult('verifyResult', data);
+    if (data.is_valid) {
+      log('Doğrulama BAŞARILI ✓ — Kimlik geçerli', 'ok');
+    } else {
+      log('Doğrulama BAŞARISIZ — Kimlik geçersiz', 'warn');
+    }
+    setTimeout(advanceStep, 600);
+  } catch (e) {
+    showResult('verifyResult', e.message, true);
+    log('HATA: ' + e.message, 'err');
+  }
+}
+
+// === QUERY ===
+function renderTable(items, columns) {
+  if (!items || items.length === 0) return '<div class="empty-state"><div class="icon">📭</div>Kayıt bulunamadı</div>';
+  let html = '<table class="data-table"><thead><tr>';
+  columns.forEach(c => html += `<th>${c.label}</th>`);
+  html += '</tr></thead><tbody>';
+  items.forEach(item => {
+    html += '<tr>';
+    columns.forEach(c => {
+      const val = typeof c.key === 'function' ? c.key(item) : (item[c.key] ?? '-');
+      html += `<td title="${String(val)}">${val}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+async function querySchemas() {
+  log('GET /schemas', 'info');
+  try {
+    const data = await apiCall('GET', '/schemas');
+    document.getElementById('schemasTable').innerHTML = renderTable(data.schemas, [
+      { label: 'ID', key: 'id' },
+      { label: 'Ad', key: 'name' },
+      { label: 'Versiyon', key: 'version' },
+      { label: 'Alanlar', key: item => (item.attrNames || item.attr_names || []).join(', ') }
+    ]);
+    log(`${(data.schemas || []).length} schema bulundu`, 'ok');
+  } catch (e) { log('HATA: ' + e.message, 'err'); }
+}
+
+async function queryCredDefs() {
+  log('GET /cred-defs', 'info');
+  try {
+    const data = await apiCall('GET', '/cred-defs');
+    document.getElementById('credDefsTable').innerHTML = renderTable(data.cred_defs, [
+      { label: 'ID', key: 'id' },
+      { label: 'Schema ID', key: 'schemaId' },
+      { label: 'Tag', key: 'tag' }
+    ]);
+    log(`${(data.cred_defs || []).length} cred-def bulundu`, 'ok');
+  } catch (e) { log('HATA: ' + e.message, 'err'); }
+}
+
+async function queryCreds() {
+  log('GET /credentials', 'info');
+  try {
+    const data = await apiCall('GET', '/credentials');
+    document.getElementById('credsTable').innerHTML = renderTable(data.credentials, [
+      { label: 'Referent', key: 'referent' },
+      { label: 'Schema ID', key: 'schema_id' },
+      { label: 'Cred Def ID', key: 'cred_def_id' },
+      { label: 'Değerler', key: item => JSON.stringify(item.attrs || item.values || {}).substring(0, 60) + '...' }
+    ]);
+    log(`${(data.credentials || []).length} credential bulundu`, 'ok');
+  } catch (e) { log('HATA: ' + e.message, 'err'); }
+}
+
+// === TABS ===
+function switchTab(btn, tabId) {
+  btn.closest('.card').querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  btn.closest('.card').querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+</script>
+
+</body>
+</html>

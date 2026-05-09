@@ -39,6 +39,11 @@ class Nixar:
   is_logging_init = False
   logging_init_lock = threading.Lock()
 
+  # Kütüphane process başına bir kez yüklenir; tüm instance'lar paylaşır.
+  _lib_ffi = None
+  _lib_nixar = None
+  _lib_lock = threading.Lock()
+
   def __init__(
       self,
       name: str,
@@ -55,46 +60,68 @@ class Nixar:
     self.agen_name = name
     self.__load_nixar_library()
     self.wallet_password_cb = self.__create_wallet_password_cb(password_cb)
-    self.__create_agent(name, role, base64_seed, wallet_type, db_wallet_host, db_wallet_username, db_wallet_password)
+    try:
+      self.__create_agent(name, role, base64_seed, wallet_type, db_wallet_host, db_wallet_username, db_wallet_password)
+    except NixarError as err:
+      if err.code == "RecordNotFound":
+        # Cüzdan zaten mevcut (önceki çalışmadan kaldı), yeniden açıyoruz.
+        logging.info(f"Agent '{name}' cüzdanda mevcut, open_agent ile açılıyor...")
+        alias_ptr = self.__native_string(name)
+        result = self.__externalize_sdk_result(self.nixar.open_agent(alias_ptr, self.wallet_password_cb))
+        self.agent_handle = result['handle']
+      else:
+        raise
 
   def __load_nixar_library(self):
-    self.ffi = cffi.FFI()
-    # load header
-    folder_path = os.path.dirname(os.path.abspath(__file__))
-    with open(f"{folder_path}/nixar_api.h") as f:
-      lines = [line for line in f if not line.startswith('#')]
-      self.ffi.cdef(''.join(lines))
+    with Nixar._lib_lock:
+      if Nixar._lib_ffi is not None:
+        # Kütüphane zaten yüklendi, paylaşılan handle'ı kullan
+        self.ffi = Nixar._lib_ffi
+        self.nixar = Nixar._lib_nixar
+        return
 
-    # load library
-    logging.info(f"Platform {platform.system()}")
-    if platform.system() == 'Darwin':
-      find_library = ctypes.util.find_library("libnixar_core")
-      if find_library is None:
-        raise Exception('Nixar library not found')
-      logging.info(find_library)
-      self.nixar = self.ffi.dlopen(find_library)
-    elif platform.system() == 'Windows':
-      self.nixar = self.ffi.dlopen("libnixar_core.dll")
-    elif platform.system() == 'Linux':
-      find_library = ctypes.util.find_library('nixar_core')
-      if find_library is None:
-        # Docker ortamındaki bilinen dizinleri kontrol edelim
-        docker_path_1 = "/app/nixar_api_linux/x86_64-unknown-linux-gnu/libnixar_core.so"
-        docker_path_2 = "/app/nixar_api_linux/ubuntu_20/libnixar_core.so"
-        if os.path.exists(docker_path_1):
-          find_library = docker_path_1
-        elif os.path.exists(docker_path_2):
-          find_library = docker_path_2
-        elif os.path.exists("libnixar_core.so"):
-          find_library = "libnixar_core.so"
-        else:
+      ffi = cffi.FFI()
+      # load header
+      folder_path = os.path.dirname(os.path.abspath(__file__))
+      with open(f"{folder_path}/nixar_api.h") as f:
+        lines = [line for line in f if not line.startswith('#')]
+        ffi.cdef(''.join(lines))
+
+      # load library
+      logging.info(f"Platform {platform.system()}")
+      if platform.system() == 'Darwin':
+        find_library = ctypes.util.find_library("libnixar_core")
+        if find_library is None:
           raise Exception('Nixar library not found')
-      logging.info(find_library)
-      self.nixar = self.ffi.dlopen(find_library)
-    else:
-      raise Exception('Operating system not determined')
+        logging.info(find_library)
+        nixar = ffi.dlopen(find_library)
+      elif platform.system() == 'Windows':
+        nixar = ffi.dlopen("libnixar_core.dll")
+      elif platform.system() == 'Linux':
+        find_library = ctypes.util.find_library('nixar_core')
+        if find_library is None:
+          # Docker ortamındaki bilinen dizinleri kontrol edelim
+          docker_path_1 = "/app/nixar_api_linux/x86_64-unknown-linux-gnu/libnixar_core.so"
+          docker_path_2 = "/app/nixar_api_linux/ubuntu_20/libnixar_core.so"
+          if os.path.exists(docker_path_1):
+            find_library = docker_path_1
+          elif os.path.exists(docker_path_2):
+            find_library = docker_path_2
+          elif os.path.exists("libnixar_core.so"):
+            find_library = "libnixar_core.so"
+          else:
+            raise Exception('Nixar library not found')
+        logging.info(find_library)
+        nixar = ffi.dlopen(find_library)
+      else:
+        raise Exception('Operating system not determined')
 
-    logging.info('libnixar_core was loaded')
+      logging.info('libnixar_core was loaded')
+
+      Nixar._lib_ffi = ffi
+      Nixar._lib_nixar = nixar
+      self.ffi = ffi
+      self.nixar = nixar
 
     self.__set_nixar_home_path(".tmp")
 
@@ -114,7 +141,13 @@ class Nixar:
     self.nixar.set_nixar_home_path(absolute_nixar_home_path)
 
   def __create_wallet_password_cb(self, password_cb):
-    return self.ffi.callback('WalletPasswordCallback', password_cb)
+    ffi = self.ffi
+    def _wrapped_cb():
+      result = password_cb()
+      if isinstance(result, str):
+        return ffi.new('char[]', result.encode('utf-8'))
+      return result
+    return ffi.callback('WalletPasswordCallback', _wrapped_cb)
 
   def __native_string(self, v):
     if v is None:
@@ -193,6 +226,15 @@ class Nixar:
     result = self.__externalize_sdk_result(self.nixar.open_agent(alias, self.wallet_password_cb))
 
     self.agent_handle = result['handle']
+
+  def reconnect(self):
+    """ZMQ pool bağlantısını yenilemek için open_agent'i tekrar çağırır.
+    Ledger write işlemleri öncesinde pool connection'un aktif olduğundan emin olur."""
+    logging.info(f"Agent '{self.agen_name}' reconnect başlıyor...")
+    alias_ptr = self.__native_string(self.agen_name)
+    result = self.__externalize_sdk_result(self.nixar.open_agent(alias_ptr, self.wallet_password_cb))
+    self.agent_handle = result['handle']
+    logging.info(f"Agent '{self.agen_name}' reconnect tamamlandı.")
 
   def change_password(self, new_password_cb):
     new_wallet_password_cb = self.__create_wallet_password_cb(new_password_cb)
